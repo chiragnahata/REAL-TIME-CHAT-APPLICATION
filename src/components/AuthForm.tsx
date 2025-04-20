@@ -1,8 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { loginSchema, signupSchema } from "@/types/auth";
+import type { LoginFormValues, SignupFormValues } from "@/types/auth";
 import {
   Card,
   CardContent,
@@ -19,34 +22,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AtSign, Lock, User, Github, Twitter } from "lucide-react";
 
-// Form validation schemas
-const loginSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address" }),
-  password: z
-    .string()
-    .min(6, { message: "Password must be at least 6 characters" }),
-  rememberMe: z.boolean().optional(),
-});
-
-const signupSchema = z
-  .object({
-    username: z
-      .string()
-      .min(3, { message: "Username must be at least 3 characters" }),
-    email: z.string().email({ message: "Please enter a valid email address" }),
-    password: z
-      .string()
-      .min(6, { message: "Password must be at least 6 characters" }),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
-
-type LoginFormValues = z.infer<typeof loginSchema>;
-type SignupFormValues = z.infer<typeof signupSchema>;
-
 interface AuthFormProps {
   onLogin?: (data: LoginFormValues) => void;
   onSignup?: (data: SignupFormValues) => void;
@@ -54,12 +29,31 @@ interface AuthFormProps {
   error?: string | null;
 }
 
-const AuthForm = ({
-  onLogin = () => {},
-  onSignup = () => {},
-  isLoading = false,
-  error = null,
-}: AuthFormProps) => {
+const AuthForm = (props: AuthFormProps) => {
+  const {
+    login,
+    signup,
+    isAuthenticated,
+    isLoading: authLoading,
+    error: authError,
+  } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      const from = (location.state as any)?.from?.pathname || "/";
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, location]);
+
+  // Use props or context values
+  const onLogin = props.onLogin || login;
+  const onSignup = props.onSignup || signup;
+  const isLoading =
+    props.isLoading !== undefined ? props.isLoading : authLoading;
+  const error = props.error !== undefined ? props.error : authError;
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
 
   const loginForm = useForm<LoginFormValues>({
@@ -81,12 +75,24 @@ const AuthForm = ({
     },
   });
 
-  const handleLoginSubmit = (data: LoginFormValues) => {
-    onLogin(data);
+  const handleLoginSubmit = async (data: LoginFormValues) => {
+    try {
+      await onLogin(data);
+      // Navigation is handled by the useEffect above
+    } catch (error) {
+      // Error is handled by the AuthContext
+      console.error("Login error:", error);
+    }
   };
 
-  const handleSignupSubmit = (data: SignupFormValues) => {
-    onSignup(data);
+  const handleSignupSubmit = async (data: SignupFormValues) => {
+    try {
+      await onSignup(data);
+      // Navigation is handled by the useEffect above
+    } catch (error) {
+      // Error is handled by the AuthContext
+      console.error("Signup error:", error);
+    }
   };
 
   const formVariants = {
@@ -328,28 +334,6 @@ const AuthForm = ({
                   )}
                 </AnimatePresence>
               </Tabs>
-
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-muted"></div>
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">
-                    Or continue with
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Button variant="outline" className="w-full">
-                  <Github className="mr-2 h-4 w-4" />
-                  Github
-                </Button>
-                <Button variant="outline" className="w-full">
-                  <Twitter className="mr-2 h-4 w-4" />
-                  Twitter
-                </Button>
-              </div>
             </CardContent>
             <CardFooter className="flex flex-col space-y-2 text-center text-sm text-muted-foreground">
               <p>
