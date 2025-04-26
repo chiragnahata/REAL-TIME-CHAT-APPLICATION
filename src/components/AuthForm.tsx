@@ -43,7 +43,7 @@ const AuthForm = (props: AuthFormProps) => {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      const from = (location.state as any)?.from?.pathname || "/";
+      const from = (location.state as any)?.from?.pathname || "/chat";
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, navigate, location]);
@@ -335,7 +335,23 @@ const AuthForm = (props: AuthFormProps) => {
                 </AnimatePresence>
               </Tabs>
             </CardContent>
-            <CardFooter className="flex flex-col space-y-2 text-center text-sm text-muted-foreground">
+            <CardFooter className="flex flex-col space-y-4 text-center text-sm text-muted-foreground">
+              <div className="flex justify-center space-x-4 mb-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-full bg-white/5 border-white/10 hover:bg-white/10"
+                >
+                  <Github className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-full bg-white/5 border-white/10 hover:bg-white/10"
+                >
+                  <Twitter className="h-4 w-4" />
+                </Button>
+              </div>
               <p>
                 By continuing, you agree to our{" "}
                 <Button variant="link" className="p-0 h-auto text-primary">

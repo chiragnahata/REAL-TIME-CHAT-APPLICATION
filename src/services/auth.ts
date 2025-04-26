@@ -103,22 +103,26 @@ export const signup = async (userData: SignupFormValues): Promise<User> => {
   // Simulate network delay
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  if (mockUsers[userData.email]) {
+  const email = userData.email.toLowerCase();
+  if (mockUsers[email]) {
     throw new Error("Email already in use");
   }
 
   const newUser: User = {
     id: `user-${Date.now()}`,
-    email: userData.email,
+    email: email,
     username: userData.username,
     avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.username}`,
   };
 
-  // In a real app, you would save this to a database
-  mockUsers[userData.email] = {
+  // Save to local storage
+  const updatedUsers = { ...mockUsers };
+  updatedUsers[email] = {
     password: userData.password,
     user: newUser,
   };
+
+  saveLocalUsers(updatedUsers);
 
   const authState: AuthState = {
     user: newUser,

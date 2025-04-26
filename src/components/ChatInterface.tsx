@@ -1,313 +1,285 @@
-import React, { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Send, Smile, Paperclip, MoreVertical, Users, X } from "lucide-react";
-import MessageList from "./MessageList";
-import RoomSelector from "./RoomSelector";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { Textarea } from "./ui/textarea";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { ScrollArea } from "./ui/scroll-area";
+import { useSocket } from "../contexts/SocketContext";
+import { MessageList } from "./MessageList";
+import { RoomSelector, Room } from "./RoomSelector";
+import { motion, AnimatePresence } from "framer-motion";
+import { Send, Smile, Paperclip, Users, Info } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
-import { ScrollArea } from "./ui/scroll-area";
-import { Separator } from "./ui/separator";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Message {
   id: string;
-  content: string;
-  sender: {
-    id: string;
-    name: string;
-    avatar?: string;
-  };
-  timestamp: Date;
-  read: boolean;
+  text: string;
+  sender: string;
+  timestamp: number;
+  room: string;
+  senderAvatar?: string;
 }
 
-interface Room {
-  id: string;
-  name: string;
-  description?: string;
-  members: number;
-  lastMessage?: string;
-}
-
-interface ChatInterfaceProps {
-  currentUser?: {
-    id: string;
-    name: string;
-    avatar?: string;
-  };
-  onSendMessage?: (message: string, roomId: string) => void;
-  onRoomChange?: (roomId: string) => void;
-}
-
-const ChatInterface: React.FC<ChatInterfaceProps> = ({
-  currentUser = {
-    id: "user-1",
-    name: "Cosmic Explorer",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=cosmic",
-  },
-  onSendMessage = () => {},
-  onRoomChange = () => {},
-}) => {
+export function ChatInterface() {
+  const { user } = useAuth();
+  const username = user?.username || "Guest";
   const [message, setMessage] = useState("");
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
-  const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const messageEndRef = useRef<HTMLDivElement>(null);
-
-  // Mock data for demonstration
+  const [messages, setMessages] = useState<Message[]>([]);
   const [rooms, setRooms] = useState<Room[]>([
     {
-      id: "room-1",
-      name: "Galactic Hub",
-      description: "Main discussion channel",
-      members: 42,
+      id: "general",
+      name: "General",
+      description: "General discussion",
+      members: 24,
     },
     {
-      id: "room-2",
-      name: "Mars Colony",
-      description: "Red planet settlers",
-      members: 23,
+      id: "tech",
+      name: "Tech Talk",
+      description: "All things technology",
+      members: 18,
     },
+    { id: "random", name: "Random", description: "Random topics", members: 12 },
     {
-      id: "room-3",
-      name: "Space Travelers",
-      description: "For those on the move",
-      members: 15,
-    },
-    {
-      id: "room-4",
-      name: "Quantum Physics",
-      description: "Scientific discussions",
-      members: 8,
+      id: "space",
+      name: "Space Explorers",
+      description: "Discussions about space and astronomy",
+      members: 9,
     },
   ]);
-
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "msg-1",
-      content: "Welcome to the Galactic Hub!",
-      sender: {
-        id: "system",
-        name: "System",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=system",
-      },
-      timestamp: new Date(Date.now() - 3600000),
-      read: true,
-    },
-    {
-      id: "msg-2",
-      content: "Hey everyone, just joined this channel. Excited to be here!",
-      sender: {
-        id: "user-2",
-        name: "Star Voyager",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=voyager",
-      },
-      timestamp: new Date(Date.now() - 1800000),
-      read: true,
-    },
-    {
-      id: "msg-3",
-      content: "Welcome aboard! We were just discussing the new space station.",
-      sender: {
-        id: "user-3",
-        name: "Nebula Rider",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=nebula",
-      },
-      timestamp: new Date(Date.now() - 900000),
-      read: true,
-    },
+  const [currentRoom, setCurrentRoom] = useState("general");
+  const [isTyping, setIsTyping] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [showRoomInfo, setShowRoomInfo] = useState(false);
+  const [activeUsers, setActiveUsers] = useState<string[]>([
+    "Alex",
+    "Taylor",
+    "Jordan",
   ]);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Set initial room
+  const { socket, isConnected: connected } = useSocket();
+
   useEffect(() => {
-    if (rooms.length > 0 && !currentRoom) {
-      setCurrentRoom(rooms[0]);
-      onRoomChange(rooms[0].id);
-    }
-  }, [rooms, currentRoom, onRoomChange]);
+    if (!socket) return;
 
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    // Listen for incoming messages
+    socket.on("message", (newMessage: Message) => {
+      setMessages((prev) => [...prev, newMessage]);
+    });
 
-  // Simulate typing indicators
-  useEffect(() => {
-    if (message && message.length > 0) {
-      // In a real app, this would emit a socket event
-      console.log("User is typing...");
-    }
+    // Listen for typing indicators
+    socket.on("typing", (data: { user: string; room: string }) => {
+      if (data.room === currentRoom && data.user !== username) {
+        setTypingUsers((prev) => {
+          if (!prev.includes(data.user)) {
+            return [...prev, data.user];
+          }
+          return prev;
+        });
 
-    // Simulate other users typing
-    const randomTyping = setTimeout(() => {
-      const shouldShowTyping = Math.random() > 0.7;
-      if (shouldShowTyping) {
-        setTypingUsers(["Nebula Rider"]);
-        setTimeout(() => setTypingUsers([]), 3000);
+        // Clear typing indicator after 3 seconds
+        setTimeout(() => {
+          setTypingUsers((prev) => prev.filter((user) => user !== data.user));
+        }, 3000);
       }
-    }, 5000);
+    });
 
-    return () => clearTimeout(randomTyping);
-  }, [message]);
+    // Join the default room
+    socket.emit("joinRoom", { username, room: currentRoom });
+
+    return () => {
+      socket.off("message");
+      socket.off("typing");
+    };
+  }, [socket, username, currentRoom]);
+
+  // Handle room change
+  useEffect(() => {
+    if (!socket || !connected) return;
+
+    // Leave current room and join new room
+    socket.emit("leaveRoom", { username, room: currentRoom });
+    socket.emit("joinRoom", { username, room: currentRoom });
+
+    // Clear messages when changing rooms
+    setMessages([]);
+
+    // Generate some mock messages for the room
+    const mockMessages = generateMockMessages(currentRoom, 5);
+    setTimeout(() => {
+      setMessages(mockMessages);
+    }, 500);
+  }, [currentRoom, socket, connected, username]);
+
+  // Generate mock messages for demo purposes
+  const generateMockMessages = (roomId: string, count: number): Message[] => {
+    const users = ["Alex", "Taylor", "Jordan", username];
+    const now = Date.now();
+    const mockMessages: Message[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const sender = users[Math.floor(Math.random() * users.length)];
+      const isCurrentUser = sender === username;
+
+      mockMessages.push({
+        id: `mock-${i}-${now}`,
+        text: getRandomMessage(roomId),
+        sender: sender,
+        senderAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${sender}`,
+        timestamp: now - (count - i) * 60000 - Math.random() * 30000,
+        room: roomId,
+      });
+    }
+
+    return mockMessages;
+  };
+
+  const getRandomMessage = (roomId: string): string => {
+    const messages = {
+      general: [
+        "Hey everyone! How's it going?",
+        "Just joined this awesome platform!",
+        "Anyone have recommendations for good sci-fi books?",
+        "The new UI looks amazing!",
+        "Hello from the other side of the galaxy!",
+      ],
+      tech: [
+        "Did you see the latest React update?",
+        "I'm working on a new project with Framer Motion",
+        "TypeScript has been a game changer for my workflow",
+        "What's your favorite tech stack?",
+        "Just deployed my first serverless function!",
+      ],
+      random: [
+        "Just saw the most amazing sunset!",
+        "Anyone else a coffee addict here?",
+        "What's your favorite movie?",
+        "I could really go for some pizza right now",
+        "Just adopted a puppy!",
+      ],
+      space: [
+        "The James Webb telescope images are mind-blowing",
+        "Did you know that Saturn's rings are disappearing?",
+        "I'm fascinated by black holes",
+        "The northern lights are on my bucket list",
+        "Mars colonization might happen in our lifetime!",
+      ],
+    };
+
+    const roomMessages =
+      messages[roomId as keyof typeof messages] || messages.general;
+    return roomMessages[Math.floor(Math.random() * roomMessages.length)];
+  };
 
   const handleSendMessage = () => {
-    if (message.trim() && currentRoom) {
-      const newMessage: Message = {
-        id: `msg-${Date.now()}`,
-        content: message.trim(),
-        sender: currentUser,
-        timestamp: new Date(),
-        read: false,
+    if (message.trim()) {
+      const newMessage = {
+        id: `${Date.now()}-${Math.random()}`,
+        text: message,
+        sender: username,
+        senderAvatar:
+          user?.avatar ||
+          `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+        timestamp: Date.now(),
+        room: currentRoom,
       };
 
-      setMessages([...messages, newMessage]);
-      onSendMessage(message, currentRoom.id);
+      if (socket && connected) {
+        socket.emit("sendMessage", newMessage);
+      }
+
+      setMessages((prev) => [...prev, newMessage]);
       setMessage("");
+
+      // Focus back on input after sending
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
     }
   };
 
-  const handleRoomChange = (room: Room) => {
-    setCurrentRoom(room);
-    onRoomChange(room.id);
-    setIsMobileSidebarOpen(false);
-  };
+  const handleTyping = () => {
+    if (!isTyping && socket && connected) {
+      setIsTyping(true);
+      socket.emit("typing", { user: username, room: currentRoom });
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+      // Reset typing status after 3 seconds
+      setTimeout(() => {
+        setIsTyping(false);
+      }, 3000);
     }
   };
+
+  const handleCreateRoom = (name: string, description?: string) => {
+    const newRoom = {
+      id: name.toLowerCase().replace(/\s+/g, "-"),
+      name,
+      description,
+      members: 1,
+    };
+
+    setRooms((prev) => [...prev, newRoom]);
+    setCurrentRoom(newRoom.id);
+  };
+
+  const currentRoomData = rooms.find((r) => r.id === currentRoom);
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800 text-white">
-      {/* Mobile sidebar toggle */}
-      <div className="fixed bottom-4 right-4 z-20 md:hidden">
-        <Button
-          onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-          className="rounded-full h-12 w-12 flex items-center justify-center bg-primary shadow-lg hover:bg-primary/90"
-        >
-          {isMobileSidebarOpen ? <X size={20} /> : <Users size={20} />}
-        </Button>
-      </div>
-
-      {/* Sidebar - Room Selector */}
-      <AnimatePresence>
-        {(isMobileSidebarOpen || window.innerWidth >= 768) && (
-          <motion.div
-            initial={{ x: -300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -300, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className={`absolute md:relative z-10 h-full w-72 bg-gray-800/80 backdrop-blur-md border-r border-gray-700 ${isMobileSidebarOpen ? "block" : "hidden md:block"}`}
-          >
-            <div className="p-4 border-b border-gray-700">
-              <h2 className="text-xl font-bold">Chat Rooms</h2>
-              <p className="text-sm text-gray-400">
-                Join a room to start chatting
-              </p>
-            </div>
+    <motion.div
+      className="flex h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div className="flex flex-col w-full max-w-6xl mx-auto rounded-lg overflow-hidden backdrop-blur-lg bg-black/30 border border-white/10 shadow-xl">
+        <div className="flex flex-1 overflow-hidden">
+          {/* Room selector */}
+          <div className="w-64 border-r border-white/10 p-4 bg-black/20">
             <RoomSelector
               rooms={rooms}
               currentRoom={currentRoom}
-              onRoomSelect={handleRoomChange}
+              onSelectRoom={setCurrentRoom}
+              onCreateRoom={handleCreateRoom}
+              username={username}
             />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
-        {/* Chat Header */}
-        {currentRoom && (
-          <div className="p-4 border-b border-gray-700 flex items-center justify-between bg-gray-800/50 backdrop-blur-sm">
-            <div className="flex items-center space-x-3">
-              <Avatar>
-                <AvatarImage
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${currentRoom.name}`}
-                />
-                <AvatarFallback>
-                  {currentRoom.name.substring(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h3 className="font-bold">{currentRoom.name}</h3>
-                <p className="text-xs text-gray-400">
-                  {currentRoom.members} members
-                </p>
-              </div>
-            </div>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <MoreVertical size={20} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Room options</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
           </div>
-        )}
 
-        {/* Messages Area */}
-        <ScrollArea className="flex-1 p-4 overflow-y-auto">
-          <MessageList messages={messages} currentUser={currentUser} />
-
-          {/* Typing Indicators */}
-          {typingUsers.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="flex items-center space-x-2 mt-2 text-gray-400 text-sm"
-            >
-              <div className="flex space-x-1">
-                <span className="animate-bounce">.</span>
-                <span className="animate-bounce delay-100">.</span>
-                <span className="animate-bounce delay-200">.</span>
+          {/* Chat area */}
+          <div className="flex-1 flex flex-col">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/10">
+              <div>
+                <h2 className="text-xl font-bold flex items-center">
+                  <span className="mr-2">#</span>
+                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+                    {currentRoomData?.name || "Chat"}
+                  </span>
+                </h2>
+                {currentRoomData?.description && (
+                  <div className="text-sm text-gray-400">
+                    {currentRoomData.description}
+                  </div>
+                )}
               </div>
-              <span>{typingUsers.join(", ")} is typing</span>
-            </motion.div>
-          )}
 
-          <div ref={messageEndRef} />
-        </ScrollArea>
-
-        {/* Message Input Area */}
-        <div className="p-4 border-t border-gray-700 bg-gray-800/50 backdrop-blur-sm">
-          <div className="flex items-end space-x-2">
-            <div className="flex-1 relative">
-              <Textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={handleKeyPress}
-                placeholder="Type a message..."
-                className="min-h-[60px] max-h-[120px] w-full rounded-lg bg-gray-700/50 border-gray-600 text-white resize-none focus:ring-primary"
-              />
-              <div className="absolute bottom-2 right-2 flex space-x-1">
+              <div className="flex items-center space-x-2">
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 rounded-full"
+                        className="rounded-full"
+                        onClick={() => setShowRoomInfo(!showRoomInfo)}
                       >
-                        <Smile size={18} className="text-gray-400" />
+                        <Info className="h-5 w-5 text-gray-400" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Add emoji</p>
+                      <p>Room information</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -318,30 +290,178 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 rounded-full"
+                        className="rounded-full"
                       >
-                        <Paperclip size={18} className="text-gray-400" />
+                        <Users className="h-5 w-5 text-gray-400" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Attach file</p>
+                      <p>View members</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+
+                <div className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+                  {connected ? "Connected" : "Disconnected"}
+                </div>
               </div>
             </div>
-            <Button
-              onClick={handleSendMessage}
-              className="rounded-full h-10 w-10 flex items-center justify-center bg-primary hover:bg-primary/90"
-              disabled={!message.trim()}
-            >
-              <Send size={18} />
-            </Button>
+
+            <div className="flex flex-1 overflow-hidden">
+              <div className="flex-1 flex flex-col">
+                <ScrollArea className="flex-1 p-4">
+                  <MessageList
+                    messages={messages.map((msg) => ({
+                      id: msg.id,
+                      content: msg.text,
+                      sender: {
+                        id:
+                          msg.sender === username ? "currentUser" : msg.sender,
+                        name: msg.sender,
+                        avatar: msg.senderAvatar,
+                      },
+                      timestamp: new Date(msg.timestamp),
+                      status: "read",
+                    }))}
+                    currentUserId="currentUser"
+                    isTyping={typingUsers.map((user) => ({
+                      userId: user,
+                      name: user,
+                    }))}
+                  />
+                </ScrollArea>
+
+                <div className="p-4 border-t border-white/10">
+                  <div className="flex items-center space-x-2 bg-white/5 rounded-lg p-1 border border-white/10">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-full text-gray-400 hover:text-white"
+                          >
+                            <Paperclip className="h-5 w-5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Attach file</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <Input
+                      ref={inputRef}
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      onKeyUp={handleTyping}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && !e.shiftKey && handleSendMessage()
+                      }
+                      placeholder="Type a message..."
+                      className="flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-white"
+                    />
+
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-full text-gray-400 hover:text-white"
+                          >
+                            <Smile className="h-5 w-5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Add emoji</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <Button
+                      onClick={handleSendMessage}
+                      className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-full px-4"
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      Send
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <AnimatePresence>
+                {showRoomInfo && (
+                  <motion.div
+                    className="w-64 border-l border-white/10 p-4 bg-black/20"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-semibold">Room Info</h3>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 rounded-full"
+                        onClick={() => setShowRoomInfo(false)}
+                      >
+                        &times;
+                      </Button>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-400">
+                          Created
+                        </h4>
+                        <p className="text-sm">3 days ago</p>
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-400">
+                          Members
+                        </h4>
+                        <p className="text-sm">
+                          {currentRoomData?.members || 0} members
+                        </p>
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-400 mb-2">
+                          Active Now
+                        </h4>
+                        <div className="space-y-2">
+                          {activeUsers.map((user) => (
+                            <div
+                              key={user}
+                              className="flex items-center space-x-2"
+                            >
+                              <div className="relative">
+                                <img
+                                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user}`}
+                                  alt={user}
+                                  className="h-6 w-6 rounded-full"
+                                />
+                                <div className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-green-500 border border-black"></div>
+                              </div>
+                              <span className="text-sm">{user}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
-};
+}
 
+// Add default export
 export default ChatInterface;

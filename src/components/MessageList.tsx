@@ -100,70 +100,111 @@ const MessageList = ({
     }
   };
 
-  return (
-    <div className="flex flex-col h-full w-full bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg overflow-hidden">
-      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
-        <div className="space-y-4">
-          <AnimatePresence initial={false}>
-            {messages.map((message) => {
-              const isCurrentUser = message.sender.id === currentUserId;
+  // Group messages by date
+  const groupedMessages = messages.reduce<{
+    [date: string]: Message[];
+  }>((groups, message) => {
+    const date = message.timestamp.toLocaleDateString();
+    if (!groups[date]) {
+      groups[date] = [];
+    }
+    groups[date].push(message);
+    return groups;
+  }, {});
 
-              return (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className={`flex ${isCurrentUser ? "justify-end" : "justify-start"}`}
+  // Check if message is from the same sender as the previous one
+  const isConsecutive = (message: Message, index: number, arr: Message[]) => {
+    if (index === 0) return false;
+    return message.sender.id === arr[index - 1].sender.id;
+  };
+
+  return (
+    <div className="flex flex-col h-full w-full">
+      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
+        <div className="space-y-6">
+          {Object.entries(groupedMessages).map(([date, dateMessages]) => (
+            <div key={date} className="space-y-4">
+              <div className="flex justify-center">
+                <Badge
+                  variant="outline"
+                  className="bg-gray-800/50 text-gray-400 border-gray-700"
                 >
-                  <div
-                    className={`flex ${isCurrentUser ? "flex-row-reverse" : "flex-row"} max-w-[80%] items-end gap-2`}
-                  >
-                    {!isCurrentUser && (
-                      <Avatar className="h-8 w-8 border border-primary/10">
-                        <AvatarImage
-                          src={message.sender.avatar}
-                          alt={message.sender.name}
-                        />
-                        <AvatarFallback>
-                          {message.sender.name.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
-                    <div
-                      className={`flex flex-col ${isCurrentUser ? "items-end" : "items-start"}`}
+                  {new Date(date).toLocaleDateString(undefined, {
+                    weekday: "long",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </Badge>
+              </div>
+
+              <AnimatePresence initial={false}>
+                {dateMessages.map((message, index, arr) => {
+                  const isCurrentUser = message.sender.id === currentUserId;
+                  const consecutive = isConsecutive(message, index, arr);
+
+                  return (
+                    <motion.div
+                      key={message.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className={`flex ${isCurrentUser ? "justify-end" : "justify-start"} ${consecutive ? "mt-1" : "mt-4"}`}
                     >
-                      {!isCurrentUser && (
-                        <span className="text-xs text-gray-400 mb-1">
-                          {message.sender.name}
-                        </span>
-                      )}
                       <div
-                        className={`rounded-2xl px-4 py-2 backdrop-blur-sm ${
-                          isCurrentUser
-                            ? "bg-primary/80 text-primary-foreground rounded-br-none"
-                            : "bg-gray-700/80 text-gray-100 rounded-bl-none"
-                        }`}
+                        className={`flex ${isCurrentUser ? "flex-row-reverse" : "flex-row"} max-w-[80%] items-end gap-2`}
                       >
-                        <p className="text-sm">{message.content}</p>
-                      </div>
-                      <div
-                        className={`flex items-center mt-1 text-xs text-gray-400 ${isCurrentUser ? "flex-row" : "flex-row-reverse"}`}
-                      >
-                        <span>{formatTime(message.timestamp)}</span>
-                        {isCurrentUser && (
-                          <span className="ml-1">
-                            {getStatusIcon(message.status)}
-                          </span>
+                        {!isCurrentUser && !consecutive && (
+                          <Avatar className="h-8 w-8 border border-primary/10">
+                            <AvatarImage
+                              src={message.sender.avatar}
+                              alt={message.sender.name}
+                            />
+                            <AvatarFallback>
+                              {message.sender.name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
                         )}
+                        {!isCurrentUser && consecutive && (
+                          <div className="w-8" />
+                        )}
+                        <div
+                          className={`flex flex-col ${isCurrentUser ? "items-end" : "items-start"}`}
+                        >
+                          {!isCurrentUser && !consecutive && (
+                            <span className="text-xs text-gray-400 mb-1">
+                              {message.sender.name}
+                            </span>
+                          )}
+                          <div
+                            className={`rounded-2xl px-4 py-2 backdrop-blur-sm ${
+                              isCurrentUser
+                                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-br-none"
+                                : "bg-gray-700/80 text-gray-100 rounded-bl-none"
+                            } ${consecutive && isCurrentUser ? "rounded-tr-md" : ""} ${consecutive && !isCurrentUser ? "rounded-tl-md" : ""}`}
+                          >
+                            <p className="text-sm whitespace-pre-wrap">
+                              {message.content}
+                            </p>
+                          </div>
+                          <div
+                            className={`flex items-center mt-1 text-xs text-gray-400 ${isCurrentUser ? "flex-row" : "flex-row-reverse"}`}
+                          >
+                            <span>{formatTime(message.timestamp)}</span>
+                            {isCurrentUser && (
+                              <span className="ml-1">
+                                {getStatusIcon(message.status)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+          ))}
 
           {/* Typing indicators */}
           <AnimatePresence>
@@ -232,4 +273,5 @@ const MessageList = ({
   );
 };
 
+export { MessageList };
 export default MessageList;
