@@ -9,6 +9,7 @@ const Home = lazy(() => import("./components/home"));
 const AuthForm = lazy(() => import("./components/AuthForm"));
 const ProtectedRoute = lazy(() => import("./components/ProtectedRoute"));
 const LandingPage = lazy(() => import("./components/LandingPage"));
+const WhatsAppInterface = lazy(() => import("./components/WhatsAppInterface"));
 
 function App() {
   return (
@@ -30,6 +31,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Home />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/messages"
+                element={
+                  <ProtectedRoute>
+                    <WhatsAppInterface />
                   </ProtectedRoute>
                 }
               />

@@ -26,6 +26,7 @@ const roomSchema = z.object({
     .string()
     .max(100, { message: "Description must be less than 100 characters" })
     .optional(),
+  isPrivate: z.boolean().default(false),
 });
 
 type RoomFormValues = z.infer<typeof roomSchema>;
@@ -42,6 +43,7 @@ export function CreateRoomDialog({ onCreateRoom }: CreateRoomDialogProps) {
     defaultValues: {
       name: "",
       description: "",
+      isPrivate: false,
     },
   });
 
@@ -49,6 +51,9 @@ export function CreateRoomDialog({ onCreateRoom }: CreateRoomDialogProps) {
     onCreateRoom(data.name, data.description);
     form.reset();
     setOpen(false);
+
+    // Show success message
+    alert(`Room "${data.name}" created successfully!`);
   };
 
   return (
@@ -111,6 +116,17 @@ export function CreateRoomDialog({ onCreateRoom }: CreateRoomDialogProps) {
                   {form.formState.errors.description.message}
                 </p>
               )}
+            </div>
+            <div className="flex items-center space-x-2 pt-2">
+              <input
+                type="checkbox"
+                id="isPrivate"
+                className="rounded border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500"
+                {...form.register("isPrivate")}
+              />
+              <Label htmlFor="isPrivate" className="text-white">
+                Make this room private
+              </Label>
             </div>
             <DialogFooter className="mt-6">
               <Button

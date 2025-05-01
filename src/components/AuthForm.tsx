@@ -59,8 +59,8 @@ const AuthForm = (props: AuthFormProps) => {
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
-      password: "",
+      email: "chiragnahata05@gmail.com",
+      password: "Chirag@2005",
       rememberMe: false,
     },
   });
@@ -336,22 +336,6 @@ const AuthForm = (props: AuthFormProps) => {
               </Tabs>
             </CardContent>
             <CardFooter className="flex flex-col space-y-4 text-center text-sm text-muted-foreground">
-              <div className="flex justify-center space-x-4 mb-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="rounded-full bg-white/5 border-white/10 hover:bg-white/10"
-                >
-                  <Github className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="rounded-full bg-white/5 border-white/10 hover:bg-white/10"
-                >
-                  <Twitter className="h-4 w-4" />
-                </Button>
-              </div>
               <p>
                 By continuing, you agree to our{" "}
                 <Button variant="link" className="p-0 h-auto text-primary">
@@ -361,6 +345,10 @@ const AuthForm = (props: AuthFormProps) => {
                 <Button variant="link" className="p-0 h-auto text-primary">
                   Privacy Policy
                 </Button>
+              </p>
+              <p className="text-xs text-blue-400">
+                For demo: Use email: chiragnahata05@gmail.com and password:
+                Chirag@2005
               </p>
             </CardFooter>
           </Card>

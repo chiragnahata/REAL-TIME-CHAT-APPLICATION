@@ -14,6 +14,7 @@ import {
   TooltipTrigger,
 } from "./ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
+import store from "@/services/inMemoryStore";
 
 interface Message {
   id: string;
@@ -29,46 +30,52 @@ export function ChatInterface() {
   const username = user?.username || "Guest";
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([
-    {
-      id: "general",
-      name: "General",
-      description: "General discussion",
-      members: 24,
-    },
-    {
-      id: "tech",
-      name: "Tech Talk",
-      description: "All things technology",
-      members: 18,
-    },
-    { id: "random", name: "Random", description: "Random topics", members: 12 },
-    {
-      id: "space",
-      name: "Space Explorers",
-      description: "Discussions about space and astronomy",
-      members: 9,
-    },
-  ]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [currentRoom, setCurrentRoom] = useState("general");
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [showRoomInfo, setShowRoomInfo] = useState(false);
-  const [activeUsers, setActiveUsers] = useState<string[]>([
-    "Alex",
-    "Taylor",
-    "Jordan",
-  ]);
+  const [activeUsers, setActiveUsers] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { socket, isConnected: connected } = useSocket();
+
+  // Load rooms from store
+  useEffect(() => {
+    const storeRooms = store.getAllRooms();
+    setRooms(
+      storeRooms.map((room) => ({
+        id: room.id,
+        name: room.name,
+        description: room.description || "",
+        members: room.members,
+      })),
+    );
+  }, []);
+
+  // Load active users
+  useEffect(() => {
+    const updateActiveUsers = () => {
+      const active = store.getActiveUsers();
+      setActiveUsers(active.map((user) => user.username));
+    };
+
+    updateActiveUsers();
+    store.on("userStatusChanged", updateActiveUsers);
+
+    return () => {
+      store.off("userStatusChanged", updateActiveUsers);
+    };
+  }, []);
 
   useEffect(() => {
     if (!socket) return;
 
     // Listen for incoming messages
     socket.on("message", (newMessage: Message) => {
-      setMessages((prev) => [...prev, newMessage]);
+      if (newMessage.room === currentRoom) {
+        setMessages((prev) => [...prev, newMessage]);
+      }
     });
 
     // Listen for typing indicators
@@ -88,99 +95,36 @@ export function ChatInterface() {
       }
     });
 
-    // Join the default room
-    socket.emit("joinRoom", { username, room: currentRoom });
+    // Join the current room
+    if (user) {
+      store.joinRoom(user.id, currentRoom);
+    }
 
     return () => {
       socket.off("message");
       socket.off("typing");
     };
-  }, [socket, username, currentRoom]);
+  }, [socket, username, currentRoom, user]);
 
   // Handle room change
   useEffect(() => {
-    if (!socket || !connected) return;
+    if (!socket || !connected || !user) return;
 
     // Leave current room and join new room
-    socket.emit("leaveRoom", { username, room: currentRoom });
-    socket.emit("joinRoom", { username, room: currentRoom });
+    store.leaveRoom(user.id, currentRoom);
+    store.joinRoom(user.id, currentRoom);
 
-    // Clear messages when changing rooms
-    setMessages([]);
-
-    // Generate some mock messages for the room
-    const mockMessages = generateMockMessages(currentRoom, 5);
-    setTimeout(() => {
-      setMessages(mockMessages);
-    }, 500);
-  }, [currentRoom, socket, connected, username]);
-
-  // Generate mock messages for demo purposes
-  const generateMockMessages = (roomId: string, count: number): Message[] => {
-    const users = ["Alex", "Taylor", "Jordan", username];
-    const now = Date.now();
-    const mockMessages: Message[] = [];
-
-    for (let i = 0; i < count; i++) {
-      const sender = users[Math.floor(Math.random() * users.length)];
-      const isCurrentUser = sender === username;
-
-      mockMessages.push({
-        id: `mock-${i}-${now}`,
-        text: getRandomMessage(roomId),
-        sender: sender,
-        senderAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${sender}`,
-        timestamp: now - (count - i) * 60000 - Math.random() * 30000,
-        room: roomId,
-      });
-    }
-
-    return mockMessages;
-  };
-
-  const getRandomMessage = (roomId: string): string => {
-    const messages = {
-      general: [
-        "Hey everyone! How's it going?",
-        "Just joined this awesome platform!",
-        "Anyone have recommendations for good sci-fi books?",
-        "The new UI looks amazing!",
-        "Hello from the other side of the galaxy!",
-      ],
-      tech: [
-        "Did you see the latest React update?",
-        "I'm working on a new project with Framer Motion",
-        "TypeScript has been a game changer for my workflow",
-        "What's your favorite tech stack?",
-        "Just deployed my first serverless function!",
-      ],
-      random: [
-        "Just saw the most amazing sunset!",
-        "Anyone else a coffee addict here?",
-        "What's your favorite movie?",
-        "I could really go for some pizza right now",
-        "Just adopted a puppy!",
-      ],
-      space: [
-        "The James Webb telescope images are mind-blowing",
-        "Did you know that Saturn's rings are disappearing?",
-        "I'm fascinated by black holes",
-        "The northern lights are on my bucket list",
-        "Mars colonization might happen in our lifetime!",
-      ],
-    };
-
-    const roomMessages =
-      messages[roomId as keyof typeof messages] || messages.general;
-    return roomMessages[Math.floor(Math.random() * roomMessages.length)];
-  };
+    // Load messages for the room
+    const roomMessages = store.getMessagesByRoom(currentRoom);
+    setMessages(roomMessages);
+  }, [currentRoom, socket, connected, user]);
 
   const handleSendMessage = () => {
-    if (message.trim()) {
+    if (message.trim() && user) {
       const newMessage = {
         id: `${Date.now()}-${Math.random()}`,
         text: message,
-        sender: username,
+        sender: user.id,
         senderAvatar:
           user?.avatar ||
           `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
@@ -188,11 +132,9 @@ export function ChatInterface() {
         room: currentRoom,
       };
 
-      if (socket && connected) {
-        socket.emit("sendMessage", newMessage);
-      }
+      // Add message to store
+      store.addMessage(newMessage);
 
-      setMessages((prev) => [...prev, newMessage]);
       setMessage("");
 
       // Focus back on input after sending
@@ -203,9 +145,11 @@ export function ChatInterface() {
   };
 
   const handleTyping = () => {
-    if (!isTyping && socket && connected) {
+    if (!isTyping && socket && connected && user) {
       setIsTyping(true);
-      socket.emit("typing", { user: username, room: currentRoom });
+
+      // Emit typing event to store
+      store.emit("userTyping", { user: username, room: currentRoom });
 
       // Reset typing status after 3 seconds
       setTimeout(() => {
@@ -220,9 +164,23 @@ export function ChatInterface() {
       name,
       description,
       members: 1,
+      createdAt: Date.now(),
     };
 
-    setRooms((prev) => [...prev, newRoom]);
+    // Add room to store
+    store.addRoom(newRoom);
+
+    // Update local state
+    setRooms((prev) => [
+      ...prev,
+      {
+        id: newRoom.id,
+        name: newRoom.name,
+        description: newRoom.description || "",
+        members: newRoom.members,
+      },
+    ]);
+
     setCurrentRoom(newRoom.id);
   };
 
@@ -311,18 +269,23 @@ export function ChatInterface() {
               <div className="flex-1 flex flex-col">
                 <ScrollArea className="flex-1 p-4">
                   <MessageList
-                    messages={messages.map((msg) => ({
-                      id: msg.id,
-                      content: msg.text,
-                      sender: {
-                        id:
-                          msg.sender === username ? "currentUser" : msg.sender,
-                        name: msg.sender,
-                        avatar: msg.senderAvatar,
-                      },
-                      timestamp: new Date(msg.timestamp),
-                      status: "read",
-                    }))}
+                    messages={messages.map((msg) => {
+                      const sender = store.getUser(msg.sender);
+                      return {
+                        id: msg.id,
+                        content: msg.text,
+                        sender: {
+                          id:
+                            msg.sender === user?.id
+                              ? "currentUser"
+                              : msg.sender,
+                          name: sender?.username || "Unknown",
+                          avatar: sender?.avatar || msg.senderAvatar,
+                        },
+                        timestamp: new Date(msg.timestamp),
+                        status: "read",
+                      };
+                    })}
                     currentUserId="currentUser"
                     isTyping={typingUsers.map((user) => ({
                       userId: user,
@@ -416,7 +379,14 @@ export function ChatInterface() {
                         <h4 className="text-sm font-medium text-gray-400">
                           Created
                         </h4>
-                        <p className="text-sm">3 days ago</p>
+                        <p className="text-sm">
+                          {currentRoomData
+                            ? new Date(
+                                store.getRoom(currentRoomData.id)?.createdAt ||
+                                  Date.now(),
+                              ).toLocaleDateString()
+                            : "Unknown"}
+                        </p>
                       </div>
 
                       <div>

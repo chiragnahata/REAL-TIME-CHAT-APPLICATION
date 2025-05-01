@@ -1,55 +1,13 @@
 import { LoginFormValues, SignupFormValues } from "@/types/auth";
-
-// This is a mock authentication service
-// In production, replace with actual authentication provider like Firebase, Auth0, or Supabase
+import store, { User } from "./inMemoryStore";
 
 const STORAGE_KEY = "cosmic_chat_auth";
-
-interface User {
-  id: string;
-  email: string;
-  username: string;
-  avatar?: string;
-}
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   token: string | null;
 }
-
-// Mock user database - replace with actual database in production
-const mockUsers: Record<string, { password: string; user: User }> = {
-  "user@example.com": {
-    password: "password123",
-    user: {
-      id: "user-1",
-      email: "user@example.com",
-      username: "Cosmic Explorer",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=cosmic",
-    },
-  },
-  // Demo account for easy testing
-  "demo@cosmicchat.com": {
-    password: "demo1234",
-    user: {
-      id: "demo-user",
-      email: "demo@cosmicchat.com",
-      username: "Demo User",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=demo",
-    },
-  },
-  // Another demo account
-  "test@cosmicchat.com": {
-    password: "test1234",
-    user: {
-      id: "test-user",
-      email: "test@cosmicchat.com",
-      username: "Test User",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=test",
-    },
-  },
-};
 
 // Initialize auth state from storage
 const getInitialAuthState = (): AuthState => {
@@ -77,34 +35,46 @@ const saveAuthState = (state: AuthState): void => {
   }
 };
 
-// Mock login function
+// Login function
 export const login = async (credentials: LoginFormValues): Promise<User> => {
   // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 800));
+  await new Promise((resolve) => setTimeout(resolve, 300));
 
-  const userRecord = mockUsers[credentials.email];
+  const user = store.getUserByEmail(credentials.email);
 
-  if (!userRecord || userRecord.password !== credentials.password) {
+  if (
+    !user ||
+    (credentials.email === "chiragnahata05@gmail.com" &&
+      credentials.password !== "Chirag@2005") ||
+    (credentials.email !== "chiragnahata05@gmail.com" &&
+      credentials.password !== "password")
+  ) {
+    // Password check for demo
     throw new Error("Invalid email or password");
   }
 
+  // Update user status
+  store.setUserStatus(user.id, "online");
+
   const authState: AuthState = {
-    user: userRecord.user,
+    user,
     isAuthenticated: true,
-    token: `mock-token-${Date.now()}`,
+    token: `token-${Date.now()}`,
   };
 
   saveAuthState(authState);
-  return userRecord.user;
+  return user;
 };
 
-// Mock signup function
+// Signup function
 export const signup = async (userData: SignupFormValues): Promise<User> => {
   // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  await new Promise((resolve) => setTimeout(resolve, 300));
 
   const email = userData.email.toLowerCase();
-  if (mockUsers[email]) {
+  const existingUser = store.getUserByEmail(email);
+
+  if (existingUser) {
     throw new Error("Email already in use");
   }
 
@@ -113,21 +83,16 @@ export const signup = async (userData: SignupFormValues): Promise<User> => {
     email: email,
     username: userData.username,
     avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.username}`,
+    status: "online",
   };
 
-  // Save to local storage
-  const updatedUsers = { ...mockUsers };
-  updatedUsers[email] = {
-    password: userData.password,
-    user: newUser,
-  };
-
-  saveLocalUsers(updatedUsers);
+  // Add user to store
+  store.addUser(newUser);
 
   const authState: AuthState = {
     user: newUser,
     isAuthenticated: true,
-    token: `mock-token-${Date.now()}`,
+    token: `token-${Date.now()}`,
   };
 
   saveAuthState(authState);
@@ -136,6 +101,11 @@ export const signup = async (userData: SignupFormValues): Promise<User> => {
 
 // Logout function
 export const logout = (): void => {
+  const authState = getInitialAuthState();
+  if (authState.user) {
+    store.setUserStatus(authState.user.id, "offline");
+  }
+
   if (typeof window !== "undefined") {
     localStorage.removeItem(STORAGE_KEY);
   }
@@ -144,7 +114,12 @@ export const logout = (): void => {
 // Get current user
 export const getCurrentUser = (): User | null => {
   const authState = getInitialAuthState();
-  return authState.user;
+  if (authState.user) {
+    // Get fresh user data from store
+    const freshUser = store.getUser(authState.user.id);
+    return freshUser || authState.user;
+  }
+  return null;
 };
 
 // Check if user is authenticated
@@ -158,3 +133,21 @@ export const getToken = (): string | null => {
   const authState = getInitialAuthState();
   return authState.token;
 };
+
+// Initialize with the specified user if it doesn't exist
+export const initializeDefaultUsers = (): void => {
+  const defaultEmail = "chiragnahata05@gmail.com";
+
+  if (!store.getUserByEmail(defaultEmail)) {
+    store.addUser({
+      id: "user-chirag",
+      email: defaultEmail,
+      username: "Chirag",
+      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Chirag",
+      status: "offline",
+    });
+  }
+};
+
+// Call this function to ensure default user exists
+initializeDefaultUsers();

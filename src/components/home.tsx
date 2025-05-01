@@ -7,10 +7,12 @@ import {
   LogOut,
   Settings,
   User as UserIcon,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import ChatInterface from "./ChatInterface";
 import {
   DropdownMenu,
@@ -26,6 +28,7 @@ const Home = () => {
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [isMobile, setIsMobile] = useState(false);
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   // Check if user is on mobile device
   useEffect(() => {
@@ -106,6 +109,14 @@ const Home = () => {
           <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
             Cosmic Chat
           </h1>
+          <Button
+            variant="ghost"
+            className="ml-4 text-sm text-gray-300 hover:text-white"
+            onClick={() => navigate("/messages")}
+          >
+            <MessageSquare className="mr-1 h-4 w-4" />
+            Direct Messages
+          </Button>
         </div>
 
         <div className="flex items-center space-x-4">

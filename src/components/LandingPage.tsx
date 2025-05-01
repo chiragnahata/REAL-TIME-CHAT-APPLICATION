@@ -122,17 +122,6 @@ const LandingPage = () => {
               Learn More
             </Button>
           </motion.div>
-          <motion.div
-            className="mt-6 text-sm text-gray-400"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.9, duration: 0.8 }}
-          >
-            <p>
-              Demo credentials:{" "}
-              <span className="font-mono">demo@cosmicchat.com / demo1234</span>
-            </p>
-          </motion.div>
         </motion.div>
 
         {/* Scroll indicator */}
