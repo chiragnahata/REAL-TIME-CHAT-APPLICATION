@@ -1,13 +1,36 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ContactsList } from "./ContactsList";
 import { DirectMessage } from "./DirectMessage";
 import { useAuth } from "@/contexts/AuthContext";
+import store from "@/services/inMemoryStore";
 
 export function WhatsAppInterface() {
   const [selectedContact, setSelectedContact] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const { user } = useAuth();
+
+  // Check for mobile screen size
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Set user status to online when component mounts
+  useEffect(() => {
+    if (user) {
+      store.setUserStatus(user.id, "online");
+
+      return () => {
+        // Set user status to offline when component unmounts
+        store.setUserStatus(user.id, "offline");
+      };
+    }
+  }, [user]);
 
   const handleSelectContact = (contactId: string) => {
     setSelectedContact(contactId);

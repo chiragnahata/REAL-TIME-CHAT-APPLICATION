@@ -105,6 +105,8 @@ class InMemoryStore {
   }
 
   markMessagesAsRead(senderId: string, recipientId: string): void {
+    let hasChanges = false;
+
     this.messages.forEach((msg) => {
       if (
         msg.sender === senderId &&
@@ -112,9 +114,15 @@ class InMemoryStore {
         !msg.isRead
       ) {
         msg.isRead = true;
+        hasChanges = true;
         this.emit("messageRead", msg);
       }
     });
+
+    // Only emit the event if there were actual changes
+    if (hasChanges) {
+      this.emit("messagesUpdated", { senderId, recipientId });
+    }
   }
 
   // Room methods

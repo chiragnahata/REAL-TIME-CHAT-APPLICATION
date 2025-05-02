@@ -8,6 +8,7 @@ import { Search, Plus, MessageSquare } from "lucide-react";
 import { Badge } from "./ui/badge";
 import store, { User } from "@/services/inMemoryStore";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 export interface Contact {
   id: string;
@@ -27,6 +28,7 @@ export function ContactsList({ onSelectContact }: ContactsListProps) {
   const { user: currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const navigate = useNavigate();
 
   // Load contacts from store
   useEffect(() => {
@@ -82,12 +84,47 @@ export function ContactsList({ onSelectContact }: ContactsListProps) {
     const handleMessageRead = () => loadContacts();
     store.on("messageRead", handleMessageRead);
 
+    // Initial load of users if no contacts are available
+    if (contacts.length === 0) {
+      // Ensure we have some default users for testing
+      const defaultUsers = [
+        {
+          id: "user-1",
+          email: "user1@example.com",
+          username: "Alice",
+          status: "online" as const,
+        },
+        {
+          id: "user-2",
+          email: "user2@example.com",
+          username: "Bob",
+          status: "offline" as const,
+        },
+        {
+          id: "user-3",
+          email: "user3@example.com",
+          username: "Charlie",
+          status: "online" as const,
+        },
+      ];
+
+      // Add default users if they don't exist
+      for (const defaultUser of defaultUsers) {
+        if (!store.getUser(defaultUser.id)) {
+          store.addUser(defaultUser);
+        }
+      }
+
+      // Reload contacts after adding default users
+      loadContacts();
+    }
+
     return () => {
       store.off("userStatusChanged", handleUserStatusChange);
       store.off("messageAdded", handleNewMessage);
       store.off("messageRead", handleMessageRead);
     };
-  }, [currentUser]);
+  }, [currentUser, contacts.length]);
 
   const formatMessageTime = (timestamp: number): string => {
     const messageDate = new Date(timestamp);
@@ -146,7 +183,13 @@ export function ContactsList({ onSelectContact }: ContactsListProps) {
               <motion.div
                 key={contact.id}
                 className="p-2 rounded-lg hover:bg-white/5 cursor-pointer"
-                onClick={() => onSelectContact(contact.id)}
+                onClick={() => {
+                  onSelectContact(contact.id);
+                  // Mark messages as read when selecting a contact
+                  if (currentUser) {
+                    store.markMessagesAsRead(contact.id, currentUser.id);
+                  }
+                }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -191,9 +234,12 @@ export function ContactsList({ onSelectContact }: ContactsListProps) {
       </ScrollArea>
 
       <div className="p-4 border-t border-white/10">
-        <Button className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700">
-          <Plus className="h-4 w-4 mr-2" />
-          New Chat
+        <Button
+          className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+          onClick={() => navigate("/chat")}
+        >
+          <MessageSquare className="h-4 w-4 mr-2" />
+          Group Chats
         </Button>
       </div>
     </div>

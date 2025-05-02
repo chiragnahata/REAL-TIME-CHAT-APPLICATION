@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { useSocket } from "../contexts/SocketContext";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import {
   Send,
   Smile,
@@ -12,6 +12,7 @@ import {
   Phone,
   Video,
   MoreVertical,
+  MessageSquare,
 } from "lucide-react";
 import {
   Tooltip,
@@ -22,6 +23,8 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import store, { Message as StoreMessage } from "@/services/inMemoryStore";
+import MessageBubble from "./MessageBubble";
+import TypingIndicator from "./TypingIndicator";
 
 interface Message {
   id: string;
@@ -129,13 +132,39 @@ export function DirectMessage({
         if (newMessage.sender === contactId) {
           store.markMessagesAsRead(contactId, user.id);
         }
+
+        // Scroll to bottom when new message arrives
+        setTimeout(() => {
+          const scrollContainer = document.querySelector(
+            "#message-scroll-area [data-radix-scroll-area-viewport]",
+          );
+          if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          }
+        }, 100);
+      }
+    };
+
+    // Listen for message read status changes
+    const handleMessageRead = (readMessage: StoreMessage) => {
+      if (
+        readMessage.sender === user.id &&
+        readMessage.recipient === contactId
+      ) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === readMessage.id ? { ...msg, isRead: true } : msg,
+          ),
+        );
       }
     };
 
     store.on("messageAdded", handleNewMessage);
+    store.on("messageRead", handleMessageRead);
 
     return () => {
       store.off("messageAdded", handleNewMessage);
+      store.off("messageRead", handleMessageRead);
     };
   }, [user, contactId]);
 
@@ -176,6 +205,47 @@ export function DirectMessage({
       // Add message to store
       store.addMessage(newMessage);
       setMessage("");
+
+      // Simulate a reply after a random delay (for demo purposes)
+      if (Math.random() > 0.3) {
+        // 70% chance of reply
+        const replyDelay = Math.floor(Math.random() * 3000) + 1000; // 1-4 seconds
+
+        setTimeout(() => {
+          // Show typing indicator
+          setContactTyping(true);
+
+          // Send reply after typing
+          setTimeout(() => {
+            setContactTyping(false);
+
+            const replies = [
+              "That's interesting!",
+              "I see what you mean.",
+              "Thanks for sharing that.",
+              "I'll think about it.",
+              "Good point!",
+              "I agree with you.",
+              "Let me get back to you on that.",
+              "That's exactly what I was thinking!",
+              "Could you explain more?",
+              "I'm not sure I follow.",
+            ];
+
+            const replyMessage: StoreMessage = {
+              id: `${Date.now()}-${Math.random()}`,
+              text: replies[Math.floor(Math.random() * replies.length)],
+              sender: contact.id,
+              senderAvatar: contact.avatar,
+              timestamp: Date.now(),
+              recipient: user.id,
+              isRead: true, // Auto-read since we're looking at it
+            };
+
+            store.addMessage(replyMessage);
+          }, 1500);
+        }, replyDelay);
+      }
 
       // Focus back on input after sending
       if (inputRef.current) {
@@ -293,120 +363,44 @@ export function DirectMessage({
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="flex-1 p-4" id="message-scroll-area">
         <div className="space-y-4">
-          {messages.map((msg, index) => {
-            const isCurrentUser = msg.sender === user?.id;
-            const showAvatar =
-              index === 0 || messages[index - 1].sender !== msg.sender;
+          {messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 flex items-center justify-center mb-4">
+                <MessageSquare className="h-8 w-8 text-indigo-400" />
+              </div>
+              <p>No messages yet</p>
+              <p className="text-sm">
+                Send a message to start the conversation
+              </p>
+            </div>
+          ) : (
+            messages.map((msg, index) => {
+              const isCurrentUser = msg.sender === user?.id;
+              const showAvatar =
+                index === 0 || messages[index - 1].sender !== msg.sender;
 
-            return (
-              <motion.div
-                key={msg.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className={`flex ${isCurrentUser ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`flex ${isCurrentUser ? "flex-row-reverse" : "flex-row"} max-w-[80%] items-end gap-2`}
-                >
-                  {!isCurrentUser && showAvatar ? (
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={contact.avatar} />
-                      <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                  ) : !isCurrentUser ? (
-                    <div className="w-8"></div>
-                  ) : null}
-
-                  <div
-                    className={`flex flex-col ${isCurrentUser ? "items-end" : "items-start"}`}
-                  >
-                    <div
-                      className={`rounded-2xl px-4 py-2 ${
-                        isCurrentUser
-                          ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-br-none"
-                          : "bg-gray-700/80 text-gray-100 rounded-bl-none"
-                      }`}
-                    >
-                      <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                    </div>
-                    <div className="flex items-center mt-1 text-xs text-gray-400">
-                      <span>{formatTime(msg.timestamp)}</span>
-                      {isCurrentUser && (
-                        <span className="ml-1">
-                          {msg.isRead ? (
-                            <svg
-                              className="h-3 w-3 text-blue-500"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
-                          ) : (
-                            <svg
-                              className="h-3 w-3 text-gray-400"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
+              return (
+                <MessageBubble
+                  key={msg.id}
+                  id={msg.id}
+                  text={msg.text}
+                  timestamp={msg.timestamp}
+                  isCurrentUser={isCurrentUser}
+                  senderAvatar={isCurrentUser ? user?.avatar : contact.avatar}
+                  senderName={isCurrentUser ? username : contact.name}
+                  isRead={msg.isRead}
+                  showAvatar={showAvatar}
+                />
+              );
+            })
+          )}
 
           {/* Typing indicator */}
           <AnimatePresence>
             {contactTyping && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="flex items-start gap-2"
-              >
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={contact.avatar} />
-                  <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <div className="bg-gray-700/60 backdrop-blur-sm rounded-full px-3 py-2">
-                  <div className="flex space-x-1">
-                    <motion.div
-                      animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1, 0.8] }}
-                      transition={{ duration: 1, repeat: Infinity }}
-                      className="w-2 h-2 bg-gray-300 rounded-full"
-                    />
-                    <motion.div
-                      animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1, 0.8] }}
-                      transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
-                      className="w-2 h-2 bg-gray-300 rounded-full"
-                    />
-                    <motion.div
-                      animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1, 0.8] }}
-                      transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
-                      className="w-2 h-2 bg-gray-300 rounded-full"
-                    />
-                  </div>
-                </div>
-              </motion.div>
+              <TypingIndicator avatar={contact.avatar} name={contact.name} />
             )}
           </AnimatePresence>
         </div>
