@@ -147,6 +147,37 @@ export const initializeDefaultUsers = (): void => {
       status: "offline",
     });
   }
+
+  // Add default users for testing
+  const defaultUsers = [
+    {
+      id: "user-1",
+      email: "alice@example.com",
+      username: "Alice",
+      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alice",
+      status: "online" as const,
+    },
+    {
+      id: "user-2",
+      email: "bob@example.com",
+      username: "Bob",
+      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Bob",
+      status: "offline" as const,
+    },
+    {
+      id: "user-3",
+      email: "charlie@example.com",
+      username: "Charlie",
+      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Charlie",
+      status: "online" as const,
+    },
+  ];
+
+  for (const user of defaultUsers) {
+    if (!store.getUser(user.id)) {
+      store.addUser(user);
+    }
+  }
 };
 
 // Call this function to ensure default user exists

@@ -14,6 +14,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import ChatInterface from "./ChatInterface";
+import NotificationBell from "./NotificationBell";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -120,6 +121,8 @@ const Home = () => {
         </div>
 
         <div className="flex items-center space-x-4">
+          <NotificationBell />
+
           <Button
             variant="ghost"
             size="icon"
@@ -160,10 +163,10 @@ const Home = () => {
               <DropdownMenuSeparator className="bg-gray-700" />
               <DropdownMenuItem
                 className="cursor-pointer hover:bg-gray-800 focus:bg-gray-800"
-                onClick={() => {}}
+                onClick={() => navigate("/profile")}
               >
                 <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
+                <span>Profile</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer text-red-400 hover:text-red-300 hover:bg-gray-800 focus:bg-gray-800"

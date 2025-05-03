@@ -10,6 +10,7 @@ const AuthForm = lazy(() => import("./components/AuthForm"));
 const ProtectedRoute = lazy(() => import("./components/ProtectedRoute"));
 const LandingPage = lazy(() => import("./components/LandingPage"));
 const WhatsAppInterface = lazy(() => import("./components/WhatsAppInterface"));
+const UserProfile = lazy(() => import("./components/UserProfile"));
 
 function App() {
   return (
@@ -17,8 +18,11 @@ function App() {
       <SocketProvider>
         <Suspense
           fallback={
-            <div className="flex items-center justify-center min-h-screen">
-              Loading...
+            <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
+              <div className="flex flex-col items-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
+                <p className="text-lg">Loading Cosmic Chat...</p>
+              </div>
             </div>
           }
         >
@@ -39,6 +43,16 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <WhatsAppInterface />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <div className="min-h-screen bg-gray-900 p-8">
+                      <UserProfile />
+                    </div>
                   </ProtectedRoute>
                 }
               />

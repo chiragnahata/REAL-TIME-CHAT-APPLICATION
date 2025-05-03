@@ -84,38 +84,8 @@ export function ContactsList({ onSelectContact }: ContactsListProps) {
     const handleMessageRead = () => loadContacts();
     store.on("messageRead", handleMessageRead);
 
-    // Initial load of users if no contacts are available
+    // Reload contacts if needed
     if (contacts.length === 0) {
-      // Ensure we have some default users for testing
-      const defaultUsers = [
-        {
-          id: "user-1",
-          email: "user1@example.com",
-          username: "Alice",
-          status: "online" as const,
-        },
-        {
-          id: "user-2",
-          email: "user2@example.com",
-          username: "Bob",
-          status: "offline" as const,
-        },
-        {
-          id: "user-3",
-          email: "user3@example.com",
-          username: "Charlie",
-          status: "online" as const,
-        },
-      ];
-
-      // Add default users if they don't exist
-      for (const defaultUser of defaultUsers) {
-        if (!store.getUser(defaultUser.id)) {
-          store.addUser(defaultUser);
-        }
-      }
-
-      // Reload contacts after adding default users
       loadContacts();
     }
 

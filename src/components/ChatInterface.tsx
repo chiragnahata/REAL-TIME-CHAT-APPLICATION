@@ -6,13 +6,14 @@ import { useSocket } from "../contexts/SocketContext";
 import { MessageList } from "./MessageList";
 import { RoomSelector, Room } from "./RoomSelector";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Smile, Paperclip, Users, Info } from "lucide-react";
+import { Send, Paperclip, Users, Info } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
+import EmojiPicker from "./EmojiPicker";
 import { useAuth } from "@/contexts/AuthContext";
 import store from "@/services/inMemoryStore";
 
@@ -42,15 +43,26 @@ export function ChatInterface() {
 
   // Load rooms from store
   useEffect(() => {
-    const storeRooms = store.getAllRooms();
-    setRooms(
-      storeRooms.map((room) => ({
-        id: room.id,
-        name: room.name,
-        description: room.description || "",
-        members: room.members,
-      })),
-    );
+    const loadRooms = () => {
+      const storeRooms = store.getAllRooms();
+      setRooms(
+        storeRooms.map((room) => ({
+          id: room.id,
+          name: room.name,
+          description: room.description || "",
+          members: room.members,
+        })),
+      );
+    };
+
+    loadRooms();
+
+    // Listen for room changes
+    store.on("roomAdded", loadRooms);
+
+    return () => {
+      store.off("roomAdded", loadRooms);
+    };
   }, []);
 
   // Load active users
@@ -72,14 +84,24 @@ export function ChatInterface() {
     if (!socket) return;
 
     // Listen for incoming messages
-    socket.on("message", (newMessage: Message) => {
+    socket?.on("message", (newMessage: Message) => {
       if (newMessage.room === currentRoom) {
         setMessages((prev) => [...prev, newMessage]);
+
+        // Scroll to bottom when new message arrives
+        setTimeout(() => {
+          const scrollContainer = document.querySelector(
+            "[data-radix-scroll-area-viewport]",
+          );
+          if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          }
+        }, 100);
       }
     });
 
     // Listen for typing indicators
-    socket.on("typing", (data: { user: string; room: string }) => {
+    socket?.on("typing", (data: { user: string; room: string }) => {
       if (data.room === currentRoom && data.user !== username) {
         setTypingUsers((prev) => {
           if (!prev.includes(data.user)) {
@@ -101,23 +123,35 @@ export function ChatInterface() {
     }
 
     return () => {
-      socket.off("message");
-      socket.off("typing");
+      socket?.off("message");
+      socket?.off("typing");
     };
   }, [socket, username, currentRoom, user]);
 
   // Handle room change
   useEffect(() => {
-    if (!socket || !connected || !user) return;
+    if (!user) return;
 
     // Leave current room and join new room
-    store.leaveRoom(user.id, currentRoom);
-    store.joinRoom(user.id, currentRoom);
+    if (user) {
+      store.leaveRoom(user.id, currentRoom);
+      store.joinRoom(user.id, currentRoom);
+    }
 
     // Load messages for the room
     const roomMessages = store.getMessagesByRoom(currentRoom);
     setMessages(roomMessages);
-  }, [currentRoom, socket, connected, user]);
+
+    // Scroll to bottom when changing rooms
+    setTimeout(() => {
+      const scrollContainer = document.querySelector(
+        "[data-radix-scroll-area-viewport]",
+      );
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }, 100);
+  }, [currentRoom, user]);
 
   const handleSendMessage = () => {
     if (message.trim() && user) {
@@ -325,22 +359,11 @@ export function ChatInterface() {
                       className="flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-white"
                     />
 
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="rounded-full text-gray-400 hover:text-white"
-                          >
-                            <Smile className="h-5 w-5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Add emoji</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <EmojiPicker
+                      onEmojiSelect={(emoji) =>
+                        setMessage((prev) => prev + emoji)
+                      }
+                    />
 
                     <Button
                       onClick={handleSendMessage}

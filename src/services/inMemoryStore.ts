@@ -40,7 +40,30 @@ class InMemoryStore {
   private eventListeners: Map<string, Function[]> = new Map();
 
   constructor() {
-    // No default rooms - users will create their own
+    // Initialize with default rooms
+    this.addRoom({
+      id: "general",
+      name: "General",
+      description: "General discussion for everyone",
+      members: 1,
+      createdAt: Date.now(),
+    });
+
+    this.addRoom({
+      id: "tech",
+      name: "Technology",
+      description: "Tech discussions and news",
+      members: 1,
+      createdAt: Date.now(),
+    });
+
+    this.addRoom({
+      id: "random",
+      name: "Random",
+      description: "Random topics and fun conversations",
+      members: 1,
+      createdAt: Date.now(),
+    });
   }
 
   // User methods

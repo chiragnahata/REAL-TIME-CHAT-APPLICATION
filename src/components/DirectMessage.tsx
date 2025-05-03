@@ -3,10 +3,9 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { useSocket } from "../contexts/SocketContext";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Send,
-  Smile,
   Paperclip,
   ArrowLeft,
   Phone,
@@ -14,6 +13,7 @@ import {
   MoreVertical,
   MessageSquare,
 } from "lucide-react";
+import EmojiPicker from "./EmojiPicker";
 import {
   Tooltip,
   TooltipContent,
@@ -75,6 +75,28 @@ export function DirectMessage({
         lastSeen: contactUser.lastSeen
           ? contactUser.lastSeen.toLocaleString()
           : "unknown",
+      });
+    } else {
+      // Create a default contact if not found
+      const defaultContact = {
+        id: contactId,
+        email: `${contactId}@example.com`,
+        username:
+          contactId === "user-1"
+            ? "Alice"
+            : contactId === "user-2"
+              ? "Bob"
+              : "Charlie",
+        status: "online" as const,
+      };
+      store.addUser(defaultContact);
+
+      setContact({
+        id: defaultContact.id,
+        name: defaultContact.username,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${defaultContact.username}`,
+        status: defaultContact.status,
+        lastSeen: "Just now",
       });
     }
 
@@ -172,7 +194,7 @@ export function DirectMessage({
     if (!socket) return;
 
     // Listen for typing indicators
-    socket.on("typing", (data: { user: string; recipient: string }) => {
+    socket?.on("typing", (data: { user: string; recipient: string }) => {
       if (data.user === contact?.id && data.recipient === user?.id) {
         setContactTyping(true);
 
@@ -184,7 +206,7 @@ export function DirectMessage({
     });
 
     return () => {
-      socket.off("typing");
+      socket?.off("typing");
     };
   }, [socket, contact?.id, user?.id]);
 
@@ -438,22 +460,9 @@ export function DirectMessage({
             className="flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-white"
           />
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full text-gray-400 hover:text-white"
-                >
-                  <Smile className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Add emoji</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <EmojiPicker
+            onEmojiSelect={(emoji) => setMessage((prev) => prev + emoji)}
+          />
 
           <Button
             onClick={handleSendMessage}

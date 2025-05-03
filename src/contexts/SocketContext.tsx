@@ -80,6 +80,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       store.on("userTyping", (data: any) => {
         if (data.room) {
           newSocket.emit("typing", data);
+        } else if (data.recipient) {
+          newSocket.emit("typing", data);
         }
       });
 
