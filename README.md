@@ -108,15 +108,6 @@ pnpm build
 └── package.json       # Project dependencies
 ```
 
-## 🧪 Demo Account
-
-You can use the following credentials to test the application:
-
-- **Email**: chiragnahata05@gmail.com
-- **Password**: Chirag@2005
-
-Or create your own account to test the multi-user functionality.
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -141,4 +132,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-<p align="center">Made with ❤️ by Your Name</p>
+<p align="center">Made with ❤️ by Chirag Nahata</p>
